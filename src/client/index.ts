@@ -5,7 +5,14 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { SkillsShSection } from './SkillsShSection.tsx'
 import type { SkillsShSectionInjected } from './SkillsShSection.tsx'
 import { en, NS, zh, type SkillsShKey } from './locales.ts'
-import type { InstallResult, LocalSkill, SearchResult } from '../steward/types.ts'
+import type {
+  InstallResult,
+  LocalSkill,
+  SearchResult,
+  UninstallResult,
+  UpdateCheckResult,
+  UpdateResult,
+} from '../steward/types.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -46,6 +53,15 @@ const api: SkillsShSectionInjected = {
   },
   async install(identity, confirmed) {
     return readJson<InstallResult>(await post(`${API}/install`, { identity, confirmed }))
+  },
+  async checkUpdate(identity) {
+    return readJson<UpdateCheckResult>(await post(`${API}/check-update`, { identity }))
+  },
+  async update(identity, confirmed) {
+    return readJson<UpdateResult>(await post(`${API}/update`, { identity, confirmed }))
+  },
+  async uninstall(identity, confirmed) {
+    return readJson<UninstallResult>(await post(`${API}/uninstall`, { identity, confirmed }))
   },
 }
 
