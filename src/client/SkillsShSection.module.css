@@ -155,6 +155,25 @@
   color: var(--dsw-alias-label-tertiary, #8f959e);
 }
 
+.searchPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.searchPanelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.searchList {
+  max-height: min(42vh, 420px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .subheading {
   margin: 8px 0 0;
   font-size: 15px;

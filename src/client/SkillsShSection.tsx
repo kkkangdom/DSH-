@@ -60,6 +60,7 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
   const [notices, setNotices] = useState<ReadonlyMap<string, string>>(() => new Map())
   const [updateStatus, setUpdateStatus] = useState<ReadonlyMap<string, UpdateStatus>>(() => new Map())
   const [dialog, setDialog] = useState<Dialog | null>(null)
+  const [searchCollapsed, setSearchCollapsed] = useState(false)
 
   const loadLocal = async (): Promise<void> => {
     try {
@@ -87,7 +88,10 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
         if (result.kind === 'need-keywords') setSearchState({ phase: 'need-keywords' })
         else if (result.kind === 'empty') setSearchState({ phase: 'empty' })
         else if (result.kind === 'network-failure') setSearchState({ phase: 'network-failure', query: keyword })
-        else setSearchState({ phase: 'ok', hits: result.hits })
+        else {
+          setSearchCollapsed(false)
+          setSearchState({ phase: 'ok', hits: result.hits })
+        }
       }).catch(() => {
         if (!cancelled) setSearchState({ phase: 'network-failure', query: keyword })
       })
@@ -117,6 +121,7 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
       setDialog(null)
       if (result.kind === 'installed') {
         setNotice(identity, t('installed'))
+        setSearchCollapsed(true)
         await loadLocal()
         return
       }
@@ -212,6 +217,8 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
         local={local}
         busy={busy}
         notices={notices}
+        collapsed={searchCollapsed}
+        onToggleCollapsed={() => { setSearchCollapsed(value => !value) }}
         onRetry={() => { setSearchNonce(value => value + 1) }}
         onInstall={identity => { void runInstall(identity, false) }}
       />
@@ -296,13 +303,15 @@ function isLocalSkill(hit: SearchHit, local: readonly LocalSkill[]): boolean {
 }
 
 function SearchResults({
-  t, state, local, busy, notices, onRetry, onInstall,
+  t, state, local, busy, notices, collapsed, onToggleCollapsed, onRetry, onInstall,
 }: {
   t: (key: SkillsShKey) => string
   state: SearchState
   local: readonly LocalSkill[]
   busy: string | undefined
   notices: ReadonlyMap<string, string>
+  collapsed: boolean
+  onToggleCollapsed: () => void
   onRetry: () => void
   onInstall: (identity: string) => void
 }): ReactNode {
@@ -318,7 +327,19 @@ function SearchResults({
     )
   }
   return (
-    <ul className={css.list}>
+    <div className={css.searchPanel}>
+      <div className={css.searchPanelHead}>
+        <h3 className={css.subheading}>
+          {t('searchResultsTitle')}
+          {' '}
+          ({state.hits.length})
+        </h3>
+        <button type="button" className={css.btn} onClick={onToggleCollapsed}>
+          {collapsed ? t('expandSearch') : t('collapseSearch')}
+        </button>
+      </div>
+      {collapsed ? null : (
+    <ul className={`${css.list} ${css.searchList}`}>
       {state.hits.map(hit => (
         <li key={hit.identity} className={css.card}>
           <div className={css.cardHead}>
@@ -352,6 +373,8 @@ function SearchResults({
         </li>
       ))}
     </ul>
+      )}
+    </div>
   )
 }
 
