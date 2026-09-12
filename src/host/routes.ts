@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { SkillSteward } from '../steward/types.ts'
 
 export const API_PREFIX = '/plugin/skills-sh'
+export const CONNECTION_API_PREFIX = '/api/skills-sh'
 
 export function createHandler(steward: SkillSteward): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   return async (req, res) => {
@@ -62,6 +63,60 @@ async function readIdentityBody(req: IncomingMessage): Promise<{ identity: strin
     identity: parsed.identity,
     ...(typeof parsed.confirmed === 'boolean' ? { confirmed: parsed.confirmed } : {}),
   }
+}
+
+/** Exact Fetch routes on DSH's authenticated `/api` channel. */
+export function connectionFetchRoutes(steward: SkillSteward): readonly ConnectionFetchRoute[] {
+  const json = (body: unknown): Response => new Response(JSON.stringify(body), {
+    headers: {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+    },
+  })
+  const identityOf = async (request: Request): Promise<{ identity: string; confirmed?: boolean }> => {
+    const parsed = await request.json() as { identity?: unknown; confirmed?: unknown }
+    if (typeof parsed.identity !== 'string' || parsed.identity === '') {
+      throw new Error('identity is required')
+    }
+    return {
+      identity: parsed.identity,
+      ...(typeof parsed.confirmed === 'boolean' ? { confirmed: parsed.confirmed } : {}),
+    }
+  }
+  const post = (path: string, run: (body: { identity: string; confirmed?: boolean }) => Promise<unknown>): ConnectionFetchRoute => ({
+    path,
+    methods: ['POST'],
+    requestBody: 'buffered',
+    fetch: async (request) => json(await run(await identityOf(request))),
+  })
+  return [
+    {
+      path: `${CONNECTION_API_PREFIX}/search`,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async (request) => {
+        const q = new URL(request.url).searchParams.get('q') ?? ''
+        return json(await steward.search(q))
+      },
+    },
+    {
+      path: `${CONNECTION_API_PREFIX}/local`,
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: async () => json({ skills: await steward.listLocal() }),
+    },
+    post(`${CONNECTION_API_PREFIX}/install`, body => steward.install(body.identity, { confirmed: body.confirmed })),
+    post(`${CONNECTION_API_PREFIX}/check-update`, body => steward.checkUpdate(body.identity)),
+    post(`${CONNECTION_API_PREFIX}/update`, body => steward.update(body.identity, { confirmed: body.confirmed })),
+    post(`${CONNECTION_API_PREFIX}/uninstall`, body => steward.uninstall(body.identity, { confirmed: body.confirmed })),
+  ]
+}
+
+type ConnectionFetchRoute = {
+  readonly path: string
+  readonly methods: readonly ('GET' | 'HEAD' | 'POST')[]
+  readonly requestBody: 'buffered' | 'streaming'
+  readonly fetch: (request: Request) => Promise<Response>
 }
 
 function readBody(req: IncomingMessage): Promise<string> {

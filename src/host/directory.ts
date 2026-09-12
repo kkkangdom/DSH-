@@ -8,7 +8,10 @@ export function createSkillsShDirectory(fetcher: typeof fetch = fetch): Director
     async search(query) {
       try {
         const response = await fetcher(`${SEARCH_URL}?q=${encodeURIComponent(query)}`, {
-          headers: { accept: 'application/json' },
+          headers: {
+            accept: 'application/json',
+            'user-agent': 'dsh-skills-sh',
+          },
           signal: abortAfter(15_000),
         })
         if (!response.ok) return { ok: false, reason: 'network-failure' }
