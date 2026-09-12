@@ -24,16 +24,25 @@ export { NS }
 
 export const inject = ['slots', 'locale']
 
-const API = '/plugin/skills-sh'
+const API = '/api/skills-sh'
 
 async function readJson<T>(response: Response): Promise<T> {
+  const text = await response.text()
   if (!response.ok) throw new Error(`request failed with status ${response.status}`)
-  return await response.json() as T
+  return JSON.parse(text) as T
+}
+
+function get(path: string): Promise<Response> {
+  return fetch(path, {
+    credentials: 'same-origin',
+    headers: { accept: 'application/json' },
+  })
 }
 
 function post(path: string, body: unknown): Promise<Response> {
   return fetch(path, {
     method: 'POST',
+    credentials: 'same-origin',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify(body),
   })
@@ -41,14 +50,10 @@ function post(path: string, body: unknown): Promise<Response> {
 
 const api: SkillsShSectionInjected = {
   async search(query) {
-    return readJson<SearchResult>(await fetch(`${API}/search?q=${encodeURIComponent(query)}`, {
-      headers: { accept: 'application/json' },
-    }))
+    return readJson<SearchResult>(await get(`${API}/search?q=${encodeURIComponent(query)}`))
   },
   async listLocal() {
-    const body = await readJson<{ skills: LocalSkill[] }>(await fetch(`${API}/local`, {
-      headers: { accept: 'application/json' },
-    }))
+    const body = await readJson<{ skills: LocalSkill[] }>(await get(`${API}/local`))
     return body.skills
   },
   async install(identity, confirmed) {

@@ -44,7 +44,7 @@ describe('search', () => {
     await expect(steward.search('grill')).resolves.toEqual({ kind: 'network-failure' })
   })
 
-  it('returns hits with name, source, installs, Skills.sh url, and optional description', async () => {
+  it('returns hits with name, source, installs, Skills.sh url, without blocking on descriptions', async () => {
     const steward = createSkillSteward({
       skillsRoot: await tempSkillsRoot(),
       directory: memoryDirectory({
@@ -65,7 +65,6 @@ describe('search', () => {
         source: 'mattpocock/skills',
         installs: 681270,
         url: 'https://skills.sh/mattpocock/skills/grilling',
-        description: 'Grill the user relentlessly about a plan, decision, or idea.',
         installable: true,
       }],
     })
