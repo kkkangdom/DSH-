@@ -25,8 +25,11 @@ export function createSkillsShDirectory(fetcher: typeof fetch = fetch): Director
     async readDescription(id) {
       try {
         const response = await fetcher(`${SKILL_PAGE}/${id}`, {
-          headers: { accept: 'text/html' },
-          signal: abortAfter(10_000),
+          headers: {
+            accept: 'text/html',
+            'user-agent': 'dsh-skills-sh',
+          },
+          signal: abortAfter(2_500),
         })
         if (!response.ok) return undefined
         const html = await response.text()
