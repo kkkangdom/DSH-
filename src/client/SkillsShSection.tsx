@@ -1,7 +1,15 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { InstallResult, LocalSkill, SearchHit, SearchResult } from '../steward/types.ts'
+import type {
+  InstallResult,
+  LocalSkill,
+  SearchHit,
+  SearchResult,
+  UninstallResult,
+  UpdateCheckResult,
+  UpdateResult,
+} from '../steward/types.ts'
 import { type SkillsShKey } from './locales.ts'
 import css from './SkillsShSection.module.css'
 
@@ -9,6 +17,9 @@ export type SkillsShSectionInjected = {
   search: (query: string) => Promise<SearchResult>
   listLocal: () => Promise<readonly LocalSkill[]>
   install: (identity: string, confirmed?: boolean) => Promise<InstallResult>
+  checkUpdate: (identity: string) => Promise<UpdateCheckResult>
+  update: (identity: string, confirmed?: boolean) => Promise<UpdateResult>
+  uninstall: (identity: string, confirmed?: boolean) => Promise<UninstallResult>
 }
 
 export type SkillsShSectionProps =
@@ -29,16 +40,25 @@ type Dialog =
     readonly identity: string
     readonly coveringForeign: boolean
   }
+  | { readonly kind: 'update'; readonly identity: string }
+  | { readonly kind: 'uninstall'; readonly identity: string }
   | { readonly kind: 'message'; readonly title: string; readonly body: string }
 
+type UpdateStatus =
+  | { readonly kind: 'up-to-date' }
+  | { readonly kind: 'update-available' }
+  | { readonly kind: 'source-gone' }
+  | { readonly kind: 'network-failure' }
+
 export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
-  const { t, search, listLocal, install } = props
+  const { t, search, listLocal, install, checkUpdate, update, uninstall } = props
   const [query, setQuery] = useState('')
   const [searchNonce, setSearchNonce] = useState(0)
   const [searchState, setSearchState] = useState<SearchState>({ phase: 'need-keywords' })
   const [local, setLocal] = useState<readonly LocalSkill[]>([])
   const [busy, setBusy] = useState<string>()
   const [notices, setNotices] = useState<ReadonlyMap<string, string>>(() => new Map())
+  const [updateStatus, setUpdateStatus] = useState<ReadonlyMap<string, UpdateStatus>>(() => new Map())
   const [dialog, setDialog] = useState<Dialog | null>(null)
 
   const loadLocal = async (): Promise<void> => {
@@ -78,6 +98,14 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
     }
   }, [query, searchNonce, search])
 
+  const setNotice = (identity: string, text: string): void => {
+    setNotices(current => new Map(current).set(identity, text))
+  }
+
+  const setStatus = (identity: string, status: UpdateStatus): void => {
+    setUpdateStatus(current => new Map(current).set(identity, status))
+  }
+
   const runInstall = async (identity: string, confirmed: boolean): Promise<void> => {
     setBusy(identity)
     try {
@@ -88,11 +116,79 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
       }
       setDialog(null)
       if (result.kind === 'installed') {
-        setNotices(current => new Map(current).set(identity, t('installed')))
+        setNotice(identity, t('installed'))
         await loadLocal()
         return
       }
       setDialog({ kind: 'message', title: t('install'), body: installMessage(t, result.kind) })
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  const runUpdate = async (identity: string, confirmed: boolean): Promise<void> => {
+    setBusy(identity)
+    try {
+      if (!confirmed) {
+        const check = await checkUpdate(identity)
+        if (check.kind === 'up-to-date') {
+          setStatus(identity, { kind: 'up-to-date' })
+          return
+        }
+        if (check.kind === 'update-available') {
+          setStatus(identity, { kind: 'update-available' })
+          return
+        }
+        if (check.kind === 'source-gone') {
+          setStatus(identity, { kind: 'source-gone' })
+          await loadLocal()
+          return
+        }
+        if (check.kind === 'network-failure') {
+          setStatus(identity, { kind: 'network-failure' })
+          return
+        }
+        setDialog({ kind: 'message', title: t('checkUpdate'), body: updateCheckMessage(t, check.kind) })
+        return
+      }
+      const result = await update(identity, true)
+      setDialog(null)
+      if (result.kind === 'updated') {
+        setNotice(identity, t('updated'))
+        setStatus(identity, { kind: 'up-to-date' })
+        await loadLocal()
+        return
+      }
+      if (result.kind === 'network-failure') {
+        setStatus(identity, { kind: 'network-failure' })
+        return
+      }
+      if (result.kind === 'source-gone') {
+        setStatus(identity, { kind: 'source-gone' })
+        await loadLocal()
+        return
+      }
+      setDialog({ kind: 'message', title: t('checkUpdate'), body: updateMessage(t, result.kind) })
+      await loadLocal()
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
+  const runUninstall = async (identity: string, confirmed: boolean): Promise<void> => {
+    if (!confirmed) {
+      setDialog({ kind: 'uninstall', identity })
+      return
+    }
+    setBusy(identity)
+    try {
+      const result = await uninstall(identity, true)
+      setDialog(null)
+      if (result.kind === 'uninstalled') {
+        await loadLocal()
+        return
+      }
+      setDialog({ kind: 'message', title: t('uninstall'), body: t('notManaged') })
     } finally {
       setBusy(undefined)
     }
@@ -123,52 +219,64 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
         <p className={css.status}>{t('localEmpty')}</p>
       ) : (
         <ul className={css.list}>
-          {local.map(skill => (
-            <li key={skill.identity} className={css.card}>
-              <div className={css.cardHead}>
-                <span className={css.name}>{skill.name}</span>
-              </div>
-              <div className={css.meta}>
-                <span>{t('localSource')}: {skill.source}</span>
-              </div>
-              {notices.get(skill.identity) !== undefined ? (
-                <p className={css.status}>{notices.get(skill.identity)}</p>
-              ) : null}
-            </li>
-          ))}
+          {local.map(skill => {
+            const status = updateStatus.get(skill.identity)
+            const gone = skill.sourceStatus === 'gone' || status?.kind === 'source-gone'
+            return (
+              <li key={skill.identity} className={css.card}>
+                <div className={css.cardHead}>
+                  <span className={css.name}>{skill.name}</span>
+                </div>
+                <div className={css.meta}>
+                  <span>{t('localSource')}: {skill.source}</span>
+                </div>
+                {gone ? <p className={`${css.status} ${css.error}`}>{t('sourceGone')}</p> : null}
+                {status?.kind === 'up-to-date' ? <p className={css.status}>{t('upToDate')}</p> : null}
+                {status?.kind === 'update-available' ? <p className={css.status}>{t('updateAvailable')}</p> : null}
+                {status?.kind === 'network-failure' ? (
+                  <p className={`${css.status} ${css.error}`}>{t('updateNetwork')}</p>
+                ) : null}
+                {notices.get(skill.identity) !== undefined ? (
+                  <p className={css.status}>{notices.get(skill.identity)}</p>
+                ) : null}
+                <div className={css.actions}>
+                  <button
+                    type="button"
+                    className={css.btn}
+                    disabled={busy === skill.identity || gone}
+                    onClick={() => { void runUpdate(skill.identity, false) }}
+                  >
+                    {status?.kind === 'network-failure' ? t('retry') : t('checkUpdate')}
+                  </button>
+                  {status?.kind === 'update-available' ? (
+                    <button
+                      type="button"
+                      className={`${css.btn} ${css.btnPrimary}`}
+                      disabled={busy === skill.identity}
+                      onClick={() => { setDialog({ kind: 'update', identity: skill.identity }) }}
+                    >
+                      {t('applyUpdate')}
+                    </button>
+                  ) : null}
+                </div>
+              </li>
+            )
+          })}
         </ul>
       )}
       {dialog !== null ? (
-        <div className={css.overlay} role="dialog" aria-modal="true">
-          <div className={css.mask} onClick={() => { setDialog(null) }} />
-          <div className={css.panel}>
-            <h3 className={css.panelTitle}>
-              {dialog.kind === 'install' ? t('confirmInstallTitle') : dialog.title}
-            </h3>
-            <p className={css.panelBody}>
-              {dialog.kind === 'install'
-                ? (dialog.coveringForeign ? t('confirmForeign') : t('confirmInstall'))
-                : dialog.body}
-            </p>
-            <div className={css.panelActions}>
-              {dialog.kind === 'message' ? (
-                <button type="button" className={`${css.btn} ${css.btnPrimary}`} onClick={() => { setDialog(null) }}>{t('close')}</button>
-              ) : (
-                <>
-                  <button type="button" className={css.btn} onClick={() => { setDialog(null) }}>{t('cancel')}</button>
-                  <button
-                    type="button"
-                    className={`${css.btn} ${css.btnPrimary}`}
-                    disabled={busy !== undefined}
-                    onClick={() => { void runInstall(dialog.identity, true) }}
-                  >
-                    {t('confirm')}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <DialogView
+          t={t}
+          dialog={dialog}
+          busy={busy}
+          onCancel={() => { setDialog(null) }}
+          onConfirm={() => {
+            if (dialog.kind === 'install') void runInstall(dialog.identity, true)
+            else if (dialog.kind === 'update') void runUpdate(dialog.identity, true)
+            else if (dialog.kind === 'uninstall') void runUninstall(dialog.identity, true)
+            else setDialog(null)
+          }}
+        />
       ) : null}
     </section>
   )
@@ -231,6 +339,53 @@ function SearchResults({
   )
 }
 
+function DialogView({
+  t, dialog, busy, onCancel, onConfirm,
+}: {
+  t: (key: SkillsShKey) => string
+  dialog: Dialog
+  busy: string | undefined
+  onCancel: () => void
+  onConfirm: () => void
+}): ReactNode {
+  const title = dialog.kind === 'install' ? t('confirmInstallTitle')
+    : dialog.kind === 'update' ? t('confirmUpdateTitle')
+      : dialog.kind === 'uninstall' ? t('confirmUninstallTitle')
+        : dialog.title
+  const body = dialog.kind === 'install'
+    ? (dialog.coveringForeign ? t('confirmForeign') : t('confirmInstall'))
+    : dialog.kind === 'update' ? t('confirmUpdate')
+      : dialog.kind === 'uninstall' ? t('confirmUninstall')
+        : dialog.body
+  const messageOnly = dialog.kind === 'message'
+  return (
+    <div className={css.overlay} role="dialog" aria-modal="true">
+      <div className={css.mask} onClick={onCancel} />
+      <div className={css.panel}>
+        <h3 className={css.panelTitle}>{title}</h3>
+        <p className={css.panelBody}>{body}</p>
+        <div className={css.panelActions}>
+          {messageOnly ? (
+            <button type="button" className={`${css.btn} ${css.btnPrimary}`} onClick={onCancel}>{t('close')}</button>
+          ) : (
+            <>
+              <button type="button" className={css.btn} onClick={onCancel}>{t('cancel')}</button>
+              <button
+                type="button"
+                className={`${css.btn} ${css.btnPrimary}`}
+                disabled={busy !== undefined}
+                onClick={onConfirm}
+              >
+                {t('confirm')}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function installMessage(t: (key: SkillsShKey) => string, kind: InstallResult['kind']): string {
   if (kind === 'unsupported-source') return t('unsupported')
   if (kind === 'no-match') return t('noMatch')
@@ -239,4 +394,25 @@ function installMessage(t: (key: SkillsShKey) => string, kind: InstallResult['ki
   if (kind === 'network-failure') return t('networkFailure')
   if (kind === 'source-gone') return t('sourceGone')
   return t('install')
+}
+
+function updateCheckMessage(t: (key: SkillsShKey) => string, kind: UpdateCheckResult['kind']): string {
+  if (kind === 'source-gone') return t('sourceGone')
+  if (kind === 'network-failure') return t('updateNetwork')
+  if (kind === 'not-managed') return t('notManaged')
+  if (kind === 'path-unsafe') return t('pathUnsafe')
+  if (kind === 'no-match') return t('noMatch')
+  if (kind === 'not-unique') return t('notUnique')
+  return t('checkUpdate')
+}
+
+function updateMessage(t: (key: SkillsShKey) => string, kind: UpdateResult['kind']): string {
+  if (kind === 'rolled-back') return t('rolledBack')
+  if (kind === 'source-gone') return t('sourceGone')
+  if (kind === 'network-failure') return t('updateNetwork')
+  if (kind === 'path-unsafe') return t('pathUnsafe')
+  if (kind === 'not-managed') return t('notManaged')
+  if (kind === 'no-match') return t('noMatch')
+  if (kind === 'not-unique') return t('notUnique')
+  return t('checkUpdate')
 }

@@ -92,11 +92,14 @@ export type UninstallResult =
   | { readonly kind: 'needs-confirmation' }
   | { readonly kind: 'not-managed' }
 
-/** The skill steward: search, list, and install in this ticket. */
+/** The skill steward: search, list, install, update, uninstall. */
 export type SkillSteward = {
   search(query: string): Promise<SearchResult>
   listLocal(): Promise<readonly LocalSkill[]>
   install(identity: string, options?: Confirmable): Promise<InstallResult>
+  checkUpdate(identity: string): Promise<UpdateCheckResult>
+  update(identity: string, options?: Confirmable): Promise<UpdateResult>
+  uninstall(identity: string, options?: Confirmable): Promise<UninstallResult>
 }
 
 export type SkillStewardOptions = {
