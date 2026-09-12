@@ -1,4 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { resolveSkillsRoot } from './home.ts'
+import { createGitHubArchives } from './host/archives.ts'
 import { createSkillsShDirectory } from './host/directory.ts'
 import { API_PREFIX, createHandler } from './host/routes.ts'
 import { createSkillSteward } from './steward/index.ts'
@@ -24,13 +26,9 @@ export type HostContext = {
 /** Mount the Skills.sh steward behind the plugin HTTP routes. */
 export function apply(ctx: HostContext): void {
   const steward = createSkillSteward({
-    skillsRoot: '',
+    skillsRoot: resolveSkillsRoot(),
     directory: createSkillsShDirectory(),
-    archives: {
-      async download() {
-        return { ok: false, reason: 'source-gone' }
-      },
-    },
+    archives: createGitHubArchives(),
   })
   ctx.effect(
     () => ctx.webServer.register({

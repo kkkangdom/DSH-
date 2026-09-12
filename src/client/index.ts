@@ -5,7 +5,7 @@ import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import { SkillsShSection } from './SkillsShSection.tsx'
 import type { SkillsShSectionInjected } from './SkillsShSection.tsx'
 import { en, NS, zh, type SkillsShKey } from './locales.ts'
-import type { SearchResult } from '../steward/types.ts'
+import type { InstallResult, LocalSkill, SearchResult } from '../steward/types.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -24,11 +24,28 @@ async function readJson<T>(response: Response): Promise<T> {
   return await response.json() as T
 }
 
+function post(path: string, body: unknown): Promise<Response> {
+  return fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 const api: SkillsShSectionInjected = {
   async search(query) {
     return readJson<SearchResult>(await fetch(`${API}/search?q=${encodeURIComponent(query)}`, {
       headers: { accept: 'application/json' },
     }))
+  },
+  async listLocal() {
+    const body = await readJson<{ skills: LocalSkill[] }>(await fetch(`${API}/local`, {
+      headers: { accept: 'application/json' },
+    }))
+    return body.skills
+  },
+  async install(identity, confirmed) {
+    return readJson<InstallResult>(await post(`${API}/install`, { identity, confirmed }))
   },
 }
 
