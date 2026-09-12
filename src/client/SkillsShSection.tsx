@@ -258,6 +258,14 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
                       {t('applyUpdate')}
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    className={css.btn}
+                    disabled={busy === skill.identity}
+                    onClick={() => { void runUninstall(skill.identity, false) }}
+                  >
+                    {t('uninstall')}
+                  </button>
                 </div>
               </li>
             )

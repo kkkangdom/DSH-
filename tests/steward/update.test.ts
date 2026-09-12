@@ -105,7 +105,7 @@ describe('check and update', () => {
     expect((await steward.listLocal())[0]?.contentHash).toBe(previousHash)
   })
 
-  it('marks a 404 as source-gone: local files stay and update is unavailable', async () => {
+  it('marks a 404 as source-gone: local files stay, update is unavailable, uninstall still works', async () => {
     const skillsRoot = await tempSkillsRoot()
     const tarball = await packTarGz({
       'grilling/SKILL.md': skillMarkdown('grilling'),
@@ -132,6 +132,11 @@ describe('check and update', () => {
       kind: 'source-gone',
     })
     expect(await readFile(path.join(skillsRoot, 'grilling', 'SKILL.md'), 'utf8')).toContain('name: grilling')
+
+    await expect(steward.uninstall('mattpocock/skills/grilling', { confirmed: true })).resolves.toEqual({
+      kind: 'uninstalled',
+    })
+    expect(await steward.listLocal()).toEqual([])
   })
 
   it('treats a temporary network failure as retryable, not source-gone', async () => {
@@ -162,5 +167,64 @@ describe('check and update', () => {
       archives: memoryArchives(),
     })
     await expect(steward.checkUpdate('mattpocock/skills/grilling')).resolves.toEqual({ kind: 'not-managed' })
+  })
+})
+
+describe('uninstall', () => {
+  it('requires confirmation, and cancel leaves disk and ledger unchanged', async () => {
+    const skillsRoot = await tempSkillsRoot()
+    const steward = createSkillSteward({
+      skillsRoot,
+      directory: memoryDirectory(),
+      archives: memoryArchives({
+        tarballs: {
+          'mattpocock/skills': await packTarGz({ 'grilling/SKILL.md': skillMarkdown('grilling') }),
+        },
+      }),
+    })
+    await steward.install('mattpocock/skills/grilling')
+
+    await expect(steward.uninstall('mattpocock/skills/grilling')).resolves.toEqual({ kind: 'needs-confirmation' })
+    expect(await steward.listLocal()).toHaveLength(1)
+    expect(await readFile(path.join(skillsRoot, 'grilling', 'SKILL.md'), 'utf8')).toContain('name: grilling')
+  })
+
+  it('removes the bundle and ledger entry after confirmation', async () => {
+    const skillsRoot = await tempSkillsRoot()
+    const steward = createSkillSteward({
+      skillsRoot,
+      directory: memoryDirectory(),
+      archives: memoryArchives({
+        tarballs: {
+          'mattpocock/skills': await packTarGz({ 'grilling/SKILL.md': skillMarkdown('grilling') }),
+        },
+      }),
+    })
+    await steward.install('mattpocock/skills/grilling')
+
+    await expect(steward.uninstall('mattpocock/skills/grilling', { confirmed: true })).resolves.toEqual({
+      kind: 'uninstalled',
+    })
+    expect(await steward.listLocal()).toEqual([])
+    await expect(readFile(path.join(skillsRoot, 'grilling', 'SKILL.md'), 'utf8')).rejects.toThrow()
+  })
+
+  it('refuses to uninstall a foreign skill and does not delete its folder', async () => {
+    const skillsRoot = await tempSkillsRoot()
+    const dest = path.join(skillsRoot, 'grilling')
+    const { mkdir } = await import('node:fs/promises')
+    await mkdir(dest, { recursive: true })
+    await writeFile(path.join(dest, 'SKILL.md'), skillMarkdown('foreign'))
+    const steward = createSkillSteward({
+      skillsRoot,
+      directory: memoryDirectory(),
+      archives: memoryArchives(),
+    })
+
+    await expect(steward.uninstall('mattpocock/skills/grilling', { confirmed: true })).resolves.toEqual({
+      kind: 'not-managed',
+    })
+    expect(await readFile(path.join(dest, 'SKILL.md'), 'utf8')).toContain('name: foreign')
+    expect(await steward.listLocal()).toEqual([])
   })
 })
