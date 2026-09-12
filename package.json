@@ -1,0 +1,67 @@
+{
+  "name": "dsh-skills-sh",
+  "version": "0.1.0",
+  "description": "DSH WebUI plugin: search Skills.sh and manage local skills this plugin installed into the DSH skills directory.",
+  "type": "module",
+  "license": "MIT",
+  "main": "./lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "prepare": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "skills.sh"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkkangdom/DSH-.git"
+  },
+  "dependencies": {
+    "esbuild": "^0.25.0",
+    "lightningcss": "^1.29.0",
+    "tar-stream": "^3.1.7"
+  },
+  "devDependencies": {
+    "@deepseek-ai/dsh-client-locale": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-runtime": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-settings": "0.1.0-rc.6",
+    "@deepseek-ai/dsh-client-ui-slots": "0.1.0-rc.6",
+    "@types/node": "^24.0.0",
+    "@types/react": "^18.3.12",
+    "@types/tar-stream": "^3.1.4",
+    "react": "18.3.1",
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}
