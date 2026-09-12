@@ -25,6 +25,16 @@ npm test
 
 从 GitHub 源码安装时会跑 `prepare`（与 `build` 相同），以便 `dsh plugin add` 之后就有可加载的 `lib/` 产物。
 
+## 测试
+
+每张 Issue 对应的 PR 都要保持测试通过。GitHub Actions 会在每个 PR 上跑类型检查、测试和构建；结果出现在 PR 的 Checks 和仓库的 Actions 页，这就是测试在仓库里的留痕。
+
+```sh
+npm test
+```
+
+测试只打技能管家（搜索、安装、路径安全、更新、卸载），用临时 DSH 技能目录和内存夹具，不访问真实网络。
+
 ## 范围
 
 - 搜索 Skills.sh（`GET https://skills.sh/api/search`）；关键词少于 2 个字符不发请求，也不拉排行榜。

@@ -25,6 +25,16 @@ npm test
 
 GitHub source installs run `prepare` (the same as `build`) so the loadable `lib/` artifacts exist after `dsh plugin add`.
 
+## Tests
+
+Each issue's PR must stay green. GitHub Actions runs typecheck, tests, and build on every pull request; results show up as checks on the PR and in the Actions tab.
+
+```sh
+npm test
+```
+
+The suite exercises the skill steward only (search, install, path safety, update, uninstall) with a temp DSH skills directory and in-memory Skills.sh / GitHub fixtures. It does not call the live network.
+
 ## Scope
 
 - Search Skills.sh (`GET https://skills.sh/api/search`); keywords shorter than 2 characters do not query and do not load a trending list.
