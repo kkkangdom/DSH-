@@ -209,6 +209,7 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
       <SearchResults
         t={t}
         state={searchState}
+        local={local}
         busy={busy}
         notices={notices}
         onRetry={() => { setSearchNonce(value => value + 1) }}
@@ -290,11 +291,16 @@ export function SkillsShSection(props: SkillsShSectionProps): ReactNode {
   )
 }
 
+function isLocalSkill(hit: SearchHit, local: readonly LocalSkill[]): boolean {
+  return local.some(skill => skill.identity === hit.identity || skill.slug === hit.slug)
+}
+
 function SearchResults({
-  t, state, busy, notices, onRetry, onInstall,
+  t, state, local, busy, notices, onRetry, onInstall,
 }: {
   t: (key: SkillsShKey) => string
   state: SearchState
+  local: readonly LocalSkill[]
   busy: string | undefined
   notices: ReadonlyMap<string, string>
   onRetry: () => void
@@ -328,7 +334,9 @@ function SearchResults({
           ) : null}
           <div className={css.actions}>
             <a className={css.link} href={hit.url} target="_blank" rel="noreferrer">{t('openPage')}</a>
-            {hit.installable ? (
+            {isLocalSkill(hit, local) ? (
+              <span className={css.hint}>{t('installed')}</span>
+            ) : hit.installable ? (
               <button
                 type="button"
                 className={`${css.btn} ${css.btnPrimary}`}

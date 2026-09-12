@@ -77,14 +77,18 @@ async function searchSkills(
   if (!response.ok) return { kind: 'network-failure' }
   if (response.hits.length === 0) return { kind: 'empty' }
 
-  const hits: SearchHit[] = response.hits.map((hit) => ({
-    identity: hit.id,
-    name: hit.name,
-    slug: hit.slug,
-    source: hit.source,
-    installs: hit.installs,
-    url: skillsShUrl(hit.id),
-    installable: isGitHubSource(hit.source),
+  const hits: SearchHit[] = await Promise.all(response.hits.map(async (hit) => {
+    const description = await directory.readDescription(hit.id).catch(() => undefined)
+    return {
+      identity: hit.id,
+      name: hit.name,
+      slug: hit.slug,
+      source: hit.source,
+      installs: hit.installs,
+      url: skillsShUrl(hit.id),
+      ...(description !== undefined && description !== '' ? { description } : {}),
+      installable: isGitHubSource(hit.source),
+    }
   }))
   return { kind: 'ok', hits }
 }
