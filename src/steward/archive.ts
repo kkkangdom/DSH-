@@ -28,10 +28,12 @@ type TarEntry = {
 export async function readTarGz(tarball: Uint8Array): Promise<readonly TarEntry[]> {
   const entries: TarEntry[] = []
   const extractor = tarExtract()
+  const gunzip = createGunzip()
   const done = new Promise<void>((resolve, reject) => {
     extractor.on('finish', () => { resolve() })
     extractor.on('end', () => { resolve() })
     extractor.on('error', reject)
+    gunzip.on('error', reject)
     extractor.on('entry', (header, stream, next) => {
       const chunks: Buffer[] = []
       stream.on('data', (chunk) => { chunks.push(chunk as Buffer) })
@@ -53,7 +55,9 @@ export async function readTarGz(tarball: Uint8Array): Promise<readonly TarEntry[
       })
     })
   })
-  Readable.from(tarball).pipe(createGunzip()).pipe(extractor)
+  // fetch().arrayBuffer() yields a plain Uint8Array. Readable.from() iterates
+  // that as numbers (gzip magic 0x1f === 31), which crashes Gunzip.
+  Readable.from([Buffer.from(tarball)]).pipe(gunzip).pipe(extractor)
   await done
   return entries
 }
