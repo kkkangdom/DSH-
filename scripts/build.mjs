@@ -73,6 +73,7 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node18',
+  packages: 'external',
   sourcemap: true,
   define: { 'process.env.NODE_ENV': JSON.stringify(nodeEnv) },
 })
