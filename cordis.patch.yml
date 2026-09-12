@@ -1,6 +1,6 @@
 # The skills-sh bundle patch: mounts the Skills.sh settings plugin row.
 # Declared through `dsh.bundle.patch` in package.json, so
-# `dsh plugin --profile web add github:kkkangdom/DSH-` appends this package
+# `dsh plugin --profile web add github:kkkangdom/dsh-skills-sh` appends this package
 # to the profile's `dsh.profile.bundles` layer stack.
 - insert:
     - id: skills-sh

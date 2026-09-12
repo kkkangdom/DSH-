@@ -2,7 +2,7 @@
 
 ### Issue tracker
 
-Issues live in this repo's GitHub Issues (`kkkangdom/DSH-`). See `docs/agents/issue-tracker.md`.
+Issues live in this repo's GitHub Issues (`kkkangdom/dsh-skills-sh`). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
