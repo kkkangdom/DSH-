@@ -31,6 +31,11 @@ export function createHandler(steward: SkillSteward): (req: IncomingMessage, res
         sendJson(res, 200, await steward.update(body.identity, { confirmed: body.confirmed }))
         return
       }
+      if (pathname === `${API_PREFIX}/uninstall` && req.method === 'POST') {
+        const body = await readIdentityBody(req)
+        sendJson(res, 200, await steward.uninstall(body.identity, { confirmed: body.confirmed }))
+        return
+      }
       sendJson(res, 404, { error: { code: 'not-found', message: pathname } })
     } catch (error) {
       sendJson(res, 400, { error: { code: 'bad-request', message: String(error) } })
